@@ -9,11 +9,6 @@
       <div class="online-count">👥 {{ onlineCount }}</div>
     </div>
 
-    <!-- 禁言提示 -->
-    <div class="ban-notice" v-if="gameStore.chatBanned">
-      <span>🔇</span> 上课中，已自动禁言。课间休息时才能聊天哦~
-    </div>
-
     <!-- 聊天消息列表 -->
     <div class="chat-messages" ref="msgContainer">
       <div 
@@ -42,26 +37,25 @@
     </div>
 
     <!-- 输入区 -->
-    <div class="chat-input-area safe-area-bottom" :class="{ banned: gameStore.chatBanned }">
+    <div class="chat-input-area safe-area-bottom">
       <div class="input-wrapper">
         <input
           v-model="inputMsg"
           type="text"
           class="chat-input"
-          :placeholder="gameStore.chatBanned ? '上课中，无法发言...' : '输入消息...'"
-          :disabled="gameStore.chatBanned"
+          placeholder="输入消息..."
           maxlength="100"
           @keyup.enter="sendMessage"
         />
         <button 
           class="send-btn"
-          :disabled="gameStore.chatBanned || !inputMsg.trim()"
+          :disabled="!inputMsg.trim()"
           @click="sendMessage"
         >
           发送
         </button>
       </div>
-      <div class="quick-phrases" v-if="!gameStore.chatBanned">
+      <div class="quick-phrases">
         <button 
           class="phrase-btn" 
           v-for="phrase in quickPhrases" 
@@ -105,7 +99,7 @@ let typingTimer = null
 let autoChatTimer = null
 
 function sendMessage() {
-  if (!inputMsg.value.trim() || gameStore.chatBanned) return
+  if (!inputMsg.value.trim()) return
   gameStore.sendChatMessage(inputMsg.value.trim())
   if (gameStore.soundEnabled) playMessageSound()
   inputMsg.value = ''
@@ -135,11 +129,11 @@ function scrollToBottom() {
   })
 }
 
-// 自动AI聊天
+// 自动AI聊天（不受上课限制，每6秒高概率触发）
 onMounted(() => {
   scrollToBottom()
   autoChatTimer = setInterval(() => {
-    if (!gameStore.chatBanned && Math.random() < 0.4) {
+    if (Math.random() < 0.5) {
       gameStore.generateAIReply()
       typingVisible.value = true
       clearTimeout(typingTimer)
@@ -148,7 +142,7 @@ onMounted(() => {
         scrollToBottom()
       }, 2000)
     }
-  }, 8000) // 每8秒有40%概率AI自动发言
+  }, 6000) // 每6秒有50%概率AI自动发言，更活跃
 })
 
 onUnmounted(() => {
@@ -316,10 +310,6 @@ watch(() => gameStore.chatMessages.length, () => {
   background: rgba(0,0,0,0.5);
   border-top: 1px solid rgba(255,255,255,0.1);
   flex-shrink: 0;
-}
-
-.chat-input-area.banned {
-  opacity: 0.6;
 }
 
 .input-wrapper {

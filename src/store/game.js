@@ -98,7 +98,7 @@ export const useGameStore = defineStore('game', () => {
     if (!schedule.value.length) return
     currentPeriod.value = getCurrentPeriod(schedule.value)
     classStatus.value = getClassStatus(schedule.value)
-    chatBanned.value = classStatus.value === 'in_class'
+    chatBanned.value = false // 取消上课禁言，随时可以聊天
     
     // 更新排行榜
     updateRankings()
@@ -215,7 +215,7 @@ export const useGameStore = defineStore('game', () => {
 
   function sendChatMessage(content) {
     if (!content.trim()) return
-    if (chatBanned.value) return // 上课禁言
+    // 不再检查上课禁言，随时可以聊天
     
     const msg = {
       id: ++chatMsgId,
@@ -272,8 +272,7 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function autoGenerateChat() {
-    // 定时自动生成AI聊天
-    if (chatBanned.value) return
+    // 定时自动生成AI聊天（不再受上课禁言限制）
     
     const shouldGenerate = Math.random() < 0.3
     if (!shouldGenerate) return
