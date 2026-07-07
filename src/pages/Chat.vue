@@ -4,9 +4,15 @@
       <button class="back-btn" @click="$router.back()">← 返回</button>
       <div class="header-center">
         <h2 class="chalk-text">💬 班级群聊</h2>
-        <span class="class-tag">{{ gameStore.currentClass?.name }}</span>
+        <span class="class-tag">{{ gameStore.currentClass?.name || '叛逆班级' }}</span>
       </div>
-      <div class="online-count">👥 {{ onlineCount }}</div>
+      <div class="online-count" v-if="mp.roomId">👥 {{ mp.roomPlayers.length }}</div>
+      <div class="online-count" v-else>👥 {{ onlineCount }}</div>
+    </div>
+
+    <!-- 多人模式连接状态 -->
+    <div class="connection-bar" v-if="mp.roomId">
+      <ConnectionStatus />
     </div>
 
     <!-- 聊天消息列表 -->
@@ -15,7 +21,11 @@
         class="msg-item"
         v-for="msg in gameStore.chatMessages"
         :key="msg.id"
-        :class="{ 'is-player': msg.isPlayer }"
+        :class="{ 
+          'is-player': msg.isPlayer && !msg.isAI, 
+          'is-multiplayer': msg.isPlayer && !msg.isAI && mp.roomId,
+          'is-ai': msg.isAI 
+        }"
       >
         <div class="msg-avatar">{{ msg.avatar }}</div>
         <div class="msg-body">
@@ -72,9 +82,12 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useGameStore } from '@/store/game'
+import { useMultiplayerStore } from '@/store/multiplayer'
 import { playMessageSound } from '@/utils/sound'
+import ConnectionStatus from '@/components/ConnectionStatus.vue'
 
 const gameStore = useGameStore()
+const mp = useMultiplayerStore()
 const inputMsg = ref('')
 const typingVisible = ref(false)
 const msgContainer = ref(null)
@@ -100,17 +113,27 @@ let autoChatTimer = null
 
 function sendMessage() {
   if (!inputMsg.value.trim()) return
-  gameStore.sendChatMessage(inputMsg.value.trim())
+  
+  if (mp.roomId) {
+    // 多人模式：通过 WebSocket 发送
+    mp.sendChat(inputMsg.value.trim())
+  } else {
+    // 单人模式：本地发送
+    gameStore.sendChatMessage(inputMsg.value.trim())
+  }
+  
   if (gameStore.soundEnabled) playMessageSound()
   inputMsg.value = ''
   scrollToBottom()
   
-  // 显示AI正在输入
-  typingVisible.value = true
-  clearTimeout(typingTimer)
-  typingTimer = setTimeout(() => {
-    typingVisible.value = false
-  }, 2500)
+  // 显示AI正在输入（仅单人模式）
+  if (!mp.roomId) {
+    typingVisible.value = true
+    clearTimeout(typingTimer)
+    typingTimer = setTimeout(() => {
+      typingVisible.value = false
+    }, 2500)
+  }
 }
 
 function sendQuickPhrase(phrase) {
@@ -129,20 +152,23 @@ function scrollToBottom() {
   })
 }
 
-// 自动AI聊天（不受上课限制，每6秒高概率触发）
+// 自动AI聊天（仅单人模式，多人模式由服务端处理）
 onMounted(() => {
   scrollToBottom()
-  autoChatTimer = setInterval(() => {
-    if (Math.random() < 0.5) {
-      gameStore.generateAIReply()
-      typingVisible.value = true
-      clearTimeout(typingTimer)
-      typingTimer = setTimeout(() => {
-        typingVisible.value = false
-        scrollToBottom()
-      }, 2000)
-    }
-  }, 6000) // 每6秒有50%概率AI自动发言，更活跃
+  
+  if (!mp.roomId) {
+    autoChatTimer = setInterval(() => {
+      if (Math.random() < 0.5) {
+        gameStore.generateAIReply()
+        typingVisible.value = true
+        clearTimeout(typingTimer)
+        typingTimer = setTimeout(() => {
+          typingVisible.value = false
+          scrollToBottom()
+        }, 2000)
+      }
+    }, 6000)
+  }
 })
 
 onUnmounted(() => {
@@ -368,5 +394,20 @@ watch(() => gameStore.chatMessages.length, () => {
 
 .phrase-btn:active {
   background: rgba(255,255,255,0.15);
+}
+
+.connection-bar {
+  padding: 0 16px 4px;
+}
+
+/* 多人消息高亮 */
+.msg-item.is-multiplayer .msg-content {
+  border: 2px solid rgba(129,178,154,0.5);
+  box-shadow: 0 0 8px rgba(129,178,154,0.2);
+}
+
+.msg-item.is-ai .msg-content {
+  background: rgba(255,255,255,0.05);
+  border: 1px dashed rgba(255,255,255,0.1);
 }
 </style>

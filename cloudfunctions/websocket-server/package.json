@@ -1,0 +1,12 @@
+{
+  "name": "school-rebellion-ws-server",
+  "version": "1.0.0",
+  "description": "叛逆校园 WebSocket 多人游戏服务端",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}

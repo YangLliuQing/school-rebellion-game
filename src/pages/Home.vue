@@ -95,6 +95,16 @@
           <span class="action-label">排行榜</span>
           <span class="action-status">No.{{ gameStore.playerRank }}</span>
         </button>
+        <button class="action-btn multiplayer-btn anim-slide-up" @click="showLobby = true" style="animation-delay: 0.6s">
+          <span class="action-icon">🌐</span>
+          <span class="action-label">多人联机</span>
+          <span class="action-status" v-if="mp.connected">🟢 已连接</span>
+          <span class="action-status" v-else>点击加入</span>
+        </button>
+      </div>
+
+      <div class="connection-bar mt-1" v-if="mp.roomId">
+        <ConnectionStatus />
       </div>
 
       <button class="btn btn-chalk btn-sm mt-2" @click="resetConfirm = true">
@@ -113,6 +123,14 @@
         </div>
       </div>
     </div>
+
+    <!-- 多人联机弹窗 -->
+    <RoomLobby 
+      :visible="showLobby" 
+      @close="showLobby = false"
+      @roomCreated="onRoomCreated"
+      @roomJoined="onRoomJoined"
+    />
   </div>
 </template>
 
@@ -120,13 +138,18 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGameStore } from '@/store/game'
+import { useMultiplayerStore } from '@/store/multiplayer'
 import { playBellStart } from '@/utils/sound'
+import RoomLobby from '@/components/RoomLobby.vue'
+import ConnectionStatus from '@/components/ConnectionStatus.vue'
 
 const router = useRouter()
 const gameStore = useGameStore()
+const mp = useMultiplayerStore()
 
 const inputName = ref('')
 const resetConfirm = ref(false)
+const showLobby = ref(false)
 
 const floatingIcons = [
   { id: 1, emoji: '📚', style: 'top:10%;left:5%;animation-delay:0s' },
@@ -159,8 +182,19 @@ function startGame() {
 
 function doReset() {
   gameStore.resetGame()
+  mp.disconnect()
   resetConfirm.value = false
   inputName.value = ''
+}
+
+function onRoomCreated(roomId) {
+  showLobby.value = false
+  router.push('/classroom')
+}
+
+function onRoomJoined(roomId) {
+  showLobby.value = false
+  router.push('/classroom')
 }
 </script>
 
@@ -375,6 +409,20 @@ function doReset() {
 .action-status.banned {
   background: rgba(224,122,95,0.2);
   color: var(--danger);
+}
+
+.multiplayer-btn {
+  border: 2px dashed rgba(129,178,154,0.4);
+  background: rgba(129,178,154,0.08);
+}
+
+.multiplayer-btn:active {
+  background: rgba(129,178,154,0.2);
+}
+
+.connection-bar {
+  display: flex;
+  justify-content: center;
 }
 
 .modal-overlay {

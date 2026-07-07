@@ -29,8 +29,8 @@
       </div>
     </div>
 
-    <!-- 答题结果 -->
-    <div class="quiz-result blackboard-card mt-2 anim-bounce" v-if="gameStore.lastQuizResult && !gameStore.currentQuestion">
+    <!-- 答题结果（单人模式） -->
+    <div class="quiz-result blackboard-card mt-2 anim-bounce" v-if="!mp.roomId && gameStore.lastQuizResult && !gameStore.currentQuestion">
       <div class="result-icon">{{ gameStore.lastQuizResult.correct ? '🎉' : '😅' }}</div>
       <h3 class="chalk-text-yellow">
         {{ gameStore.lastQuizResult.correct ? '回答正确！' : '回答错误！' }}
@@ -41,8 +41,6 @@
           🔥 {{ gameStore.lastQuizResult.streak }}连击！
         </span>
       </div>
-
-      <!-- 全班答题统计 -->
       <div class="class-stats mt-2" v-if="gameStore.quizResults.length">
         <div class="stats-bar">
           <div class="stats-correct" :style="{ width: correctRate + '%' }">
@@ -56,14 +54,38 @@
           全班 {{ gameStore.quizResults.length }} 人参与，正确率 {{ correctRate }}%
         </div>
       </div>
-
       <button class="btn btn-green btn-block mt-2" @click="gameStore.getNextQuestion()">
         ▶️ 下一题
       </button>
     </div>
 
-    <!-- 答题中 -->
-    <div class="quiz-active blackboard-card mt-2 anim-slide-up" v-if="gameStore.currentQuestion && gameStore.quizActive">
+    <!-- 答题结果（多人模式） -->
+    <div class="quiz-result blackboard-card mt-2 anim-bounce" v-if="mp.roomId && mp.lastQuizResult && !mp.serverQuizActive">
+      <div class="result-icon">{{ mp.lastQuizResult.correct ? '🎉' : '😅' }}</div>
+      <h3 class="chalk-text-yellow">
+        {{ mp.lastQuizResult.correct ? '回答正确！' : '回答错误！' }}
+      </h3>
+      <div class="result-points chalk-text mt-1" v-if="mp.lastQuizResult.correct">
+        +{{ mp.lastQuizResult.points }}分
+      </div>
+      <div class="class-stats mt-2" v-if="mp.quizAllResults.length">
+        <div class="multiplayer-results">
+          <div class="result-player" v-for="r in mp.quizAllResults.slice(0, 8)" :key="r.playerId"
+            :class="{ correct: r.correct, wrong: !r.correct, 'is-ai': r.isAI }">
+            <span class="r-emoji">{{ r.emoji || '🤖' }}</span>
+            <span class="r-name">{{ r.playerName }}</span>
+            <span class="r-tag" v-if="r.isAI">AI</span>
+            <span class="r-result">{{ r.correct ? '✅' : '❌' }}</span>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-green btn-block mt-2" @click="startQuiz" v-if="!mp.serverQuizActive">
+        ▶️ 再来一题
+      </button>
+    </div>
+
+    <!-- 答题中（单人模式） -->
+    <div class="quiz-active blackboard-card mt-2 anim-slide-up" v-if="!mp.roomId && gameStore.currentQuestion && gameStore.quizActive">
       <!-- 出题老师 -->
       <div class="teacher-bar">
         <span>{{ teacherEmoji }}</span>
@@ -97,6 +119,38 @@
       <div class="timer-text chalk-text">剩余 {{ timerSeconds }}秒</div>
     </div>
 
+    <!-- 答题中（多人模式） -->
+    <div class="quiz-active blackboard-card mt-2 anim-slide-up" v-if="mp.roomId && mp.serverQuizActive && mp.serverQuestion">
+      <div class="teacher-bar">
+        <span>👨‍🏫</span>
+        <span class="chalk-text">老师出题：</span>
+        <span class="quiz-progress">{{ mp.quizSubmitted ? '✅ 已提交' : '⏳ 待回答' }}</span>
+      </div>
+      <div class="question-card mt-1">
+        <div class="question-subject tag tag-blue">{{ mp.serverQuestion.category }}</div>
+        <div class="question-text chalk-text mt-1">{{ mp.serverQuestion.question }}</div>
+      </div>
+      <div class="options-list mt-2">
+        <button
+          v-for="(option, idx) in mp.serverQuestion.options"
+          :key="idx"
+          class="option-btn chalk-text"
+          :class="mp.quizSubmitted ? (idx === mp.correctAnswer ? 'correct' : '') : ''"
+          :disabled="mp.quizSubmitted"
+          @click="selectAnswer(idx)"
+        >
+          <span class="option-letter">{{ ['A','B','C','D'][idx] }}</span>
+          <span class="option-text">{{ option }}</span>
+        </button>
+      </div>
+      <div class="timer-bar mt-2">
+        <div class="timer-fill" :style="{ width: timerPercent + '%' }"></div>
+      </div>
+      <div class="timer-text chalk-text">
+        剩余 {{ timerSeconds }}秒 | {{ mp.quizAnswered }}/{{ mp.roomPlayers.length }}人已答
+      </div>
+    </div>
+
     <!-- 排行榜预览 -->
     <div class="ranking-preview mt-2" v-if="gameStore.topStudents.length">
       <h4 class="chalk-text mb-1">🏆 学霸榜 TOP5</h4>
@@ -114,9 +168,11 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useGameStore } from '@/store/game'
+import { useMultiplayerStore } from '@/store/multiplayer'
 import { playCorrectSound, playWrongSound, playStreakSound } from '@/utils/sound'
 
 const gameStore = useGameStore()
+const mp = useMultiplayerStore()
 
 const timerSeconds = ref(15)
 const timerPercent = ref(100)
@@ -147,7 +203,7 @@ const correctRate = computed(() => {
 })
 
 function startTimer() {
-  timerSeconds.value = 15
+  timerSeconds.value = mp.roomId ? mp.serverQuizTimer : 15
   timerPercent.value = 100
   clearInterval(timerInterval)
   timerInterval = setInterval(() => {
@@ -155,26 +211,47 @@ function startTimer() {
     timerPercent.value = (timerSeconds.value / 15) * 100
     if (timerSeconds.value <= 0) {
       clearInterval(timerInterval)
-      // 超时算错
-      selectAnswer(-1)
+      if (mp.roomId) {
+        // 多人模式超时，不做本地处理
+      } else {
+        selectAnswer(-1)
+      }
     }
   }, 1000)
 }
 
 function selectAnswer(idx) {
   clearInterval(timerInterval)
-  gameStore.submitAnswer(idx)
   
-  if (gameStore.lastQuizResult?.correct) {
+  if (mp.roomId) {
+    // 多人模式：发送答案给服务端
+    mp.submitAnswer(idx)
+  } else {
+    // 单人模式：本地判定
+    gameStore.submitAnswer(idx)
+  }
+  
+  const result = mp.roomId ? mp.lastQuizResult : gameStore.lastQuizResult
+  if (result?.correct) {
     if (gameStore.soundEnabled) {
-      if (gameStore.lastQuizResult.streak > 3) {
-        playStreakSound(gameStore.lastQuizResult.streak)
+      if (result.streak > 3) {
+        playStreakSound(result.streak)
       } else {
         playCorrectSound()
       }
     }
-  } else {
+  } else if (result) {
     if (gameStore.soundEnabled) playWrongSound()
+  }
+}
+
+function startQuiz() {
+  if (mp.roomId) {
+    // 多人模式：请求服务端发起答题
+    mp.requestQuiz()
+  } else {
+    // 单人模式：本地开始
+    gameStore.startQuiz()
   }
 }
 
@@ -193,8 +270,17 @@ watch(() => gameStore.quizActive, (val) => {
   else clearInterval(timerInterval)
 })
 
+watch(() => mp.serverQuizActive, (val) => {
+  if (val) startTimer()
+  else clearInterval(timerInterval)
+})
+
 watch(() => gameStore.currentQuestion, (val) => {
   if (val && gameStore.quizActive) startTimer()
+})
+
+watch(() => mp.serverQuestion, (val) => {
+  if (val && mp.serverQuizActive) startTimer()
 })
 </script>
 
@@ -450,4 +536,45 @@ watch(() => gameStore.currentQuestion, (val) => {
 .rank-name { flex: 1; font-size: 14px; color: var(--text-primary); }
 .rank-tag { font-size: 11px; }
 .rank-score { font-size: 13px; color: var(--chalk-yellow); font-weight: 600; }
+
+/* 多人答题结果 */
+.multiplayer-results {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.result-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.05);
+}
+
+.result-player.correct {
+  background: rgba(129,178,154,0.15);
+  border: 1px solid rgba(129,178,154,0.3);
+}
+
+.result-player.wrong {
+  background: rgba(224,122,95,0.1);
+  border: 1px solid rgba(224,122,95,0.2);
+}
+
+.result-player.is-ai {
+  opacity: 0.7;
+}
+
+.r-emoji { font-size: 18px; }
+.r-name { flex: 1; font-size: 13px; color: var(--text-primary); }
+.r-tag { font-size: 10px; color: var(--text-muted); background: rgba(255,255,255,0.1); padding: 1px 6px; border-radius: 8px; }
+.r-result { font-size: 16px; }
+
+.quiz-progress {
+  font-size: 12px;
+  color: var(--chalk-yellow);
+  margin-left: 8px;
+}
 </style>

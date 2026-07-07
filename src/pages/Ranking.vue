@@ -45,7 +45,7 @@
         class="rank-card" 
         v-for="(student, idx) in displayRanking" 
         :key="student.id || 'player'"
-        :class="{ 'is-player': student.isPlayer, ['top-' + (idx + 1)]: idx < 3 && !student.isPlayer }"
+        :class="{ 'is-player': student.isPlayer, 'is-real': student.isReal, ['top-' + (idx + 1)]: idx < 3 && !student.isPlayer }"
       >
         <div class="rank-badge">
           <span v-if="idx === 0 && !student.isPlayer">🥇</span>
@@ -105,11 +105,33 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useGameStore } from '@/store/game'
+import { useMultiplayerStore } from '@/store/multiplayer'
 
 const gameStore = useGameStore()
+const mp = useMultiplayerStore()
 const activeTab = ref('study')
 
 const displayRanking = computed(() => {
+  // 多人模式：合并真人玩家和 AI 学生
+  if (mp.roomId) {
+    const list = []
+    mp.roomPlayers.forEach(p => {
+      list.push({
+        id: p.playerId,
+        name: p.playerName,
+        score: p.score,
+        isPlayer: true,
+        isReal: true,
+        avatar: p.emoji || '😎',
+        personality: { name: '联机玩家', color: '#4ade80' }
+      })
+    })
+    // 按分数排序
+    list.sort((a, b) => b.score - a.score)
+    return list
+  }
+  
+  // 单人模式：AI 学生 + 玩家
   const list = gameStore.sortedByScore.slice(0, 20).map(s => ({
     ...s,
     isPlayer: false,
@@ -263,6 +285,11 @@ const rebelDisplay = computed(() => {
 .rank-card.is-player {
   background: rgba(247,212,74,0.1);
   border-color: rgba(247,212,74,0.3);
+}
+
+.rank-card.is-real {
+  background: rgba(74,222,128,0.1);
+  border-color: rgba(74,222,128,0.3);
 }
 
 .rank-card.top-1 { background: rgba(247,212,74,0.08); }

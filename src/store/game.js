@@ -17,6 +17,7 @@ export const useGameStore = defineStore('game', () => {
   const playerPersonality = ref(null)
   const hasCompletedSetup = ref(false)
   const streakCount = ref(0) // 连击
+  const isMultiplayer = ref(false) // 多人模式标志
 
   // ===== 班级状态 =====
   const currentClass = ref(null)
@@ -388,6 +389,7 @@ export const useGameStore = defineStore('game', () => {
     playerPersonality,
     hasCompletedSetup,
     streakCount,
+    isMultiplayer,
     currentClass,
     schedule,
     currentPeriod,

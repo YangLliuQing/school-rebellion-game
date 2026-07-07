@@ -14,6 +14,11 @@
       </div>
     </div>
 
+    <!-- 多人联机状态 -->
+    <div class="connection-bar" v-if="mp.roomId">
+      <ConnectionStatus />
+    </div>
+
     <!-- 教室场景 -->
     <div class="classroom-scene">
       <!-- 黑板 -->
@@ -49,12 +54,18 @@
             :key="col"
             :class="{ 
               'player-seat': isPlayerSeat(row-1, col-1),
+              'real-player-seat': isRealPlayerSeat(row-1, col-1),
               'active-student': isActiveStudent(getStudent(row-1, col-1))
             }"
             @click="showStudentInfo(getStudent(row-1, col-1))"
           >
             <div class="desk-top"></div>
-            <div class="student-emoji">{{ getStudent(row-1, col-1)?.personality?.emoji || '🪑' }}</div>
+            <div class="student-emoji">
+              {{ getRealPlayerEmoji(row-1, col-1) || getStudent(row-1, col-1)?.personality?.emoji || '🪑' }}
+            </div>
+            <div class="real-player-name" v-if="isRealPlayerSeat(row-1, col-1)">
+              {{ getRealPlayerName(row-1, col-1) }}
+            </div>
           </div>
         </div>
       </div>
@@ -67,10 +78,12 @@
         <div class="student-count">
           👥 {{ onlineCount }}/{{ totalCount }}人在线
         </div>
+        <div class="student-count multiplayer" v-if="mp.roomId">
+          🌐 {{ mp.roomPlayers.length }}人联机
+        </div>
       </div>
     </div>
 
-    <!-- 底部快捷操作 -->
     <div class="bottom-actions safe-area-bottom">
       <button class="quick-btn" @click="$router.push('/schedule')">
         <span>📅</span> 课表
@@ -134,8 +147,11 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useGameStore } from '@/store/game'
+import { useMultiplayerStore } from '@/store/multiplayer'
+import ConnectionStatus from '@/components/ConnectionStatus.vue'
 
 const gameStore = useGameStore()
+const mp = useMultiplayerStore()
 const selectedStudent = ref(null)
 
 const chalks = ['#f5f0e8', '#f7d44a', '#f2a7b3', '#8ecae6', '#95d5b2']
@@ -189,8 +205,29 @@ function getStudent(row, col) {
 }
 
 function isPlayerSeat(row, col) {
-  // 玩家坐在第3排第4列
-  return row === 2 && col === 3
+  // 单人模式：玩家固定在第3排第4列
+  if (!mp.roomId) return row === 2 && col === 3
+  // 多人模式：检查 seatMap
+  const seat = mp.seatMap[`${row}-${col}`]
+  return seat?.playerId === mp.playerId
+}
+
+function isRealPlayerSeat(row, col) {
+  if (!mp.roomId) return false
+  const seat = mp.seatMap[`${row}-${col}`]
+  return seat?.isReal || false
+}
+
+function getRealPlayerEmoji(row, col) {
+  if (!mp.roomId) return null
+  const seat = mp.seatMap[`${row}-${col}`]
+  return seat?.isReal ? (seat.emoji || '😎') : null
+}
+
+function getRealPlayerName(row, col) {
+  if (!mp.roomId) return null
+  const seat = mp.seatMap[`${row}-${col}`]
+  return seat?.isReal ? (seat.playerName || '同学') : null
 }
 
 function isActiveStudent(student) {
@@ -374,8 +411,35 @@ function showStudentInfo(student) {
   box-shadow: 0 0 8px rgba(247,212,74,0.4);
 }
 
+.desk.real-player-seat {
+  border: 2px solid #4ade80;
+  box-shadow: 0 0 10px rgba(74,222,128,0.5);
+  background: rgba(74,222,128,0.1);
+}
+
+.real-player-name {
+  font-size: 8px;
+  color: #4ade80;
+  text-align: center;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 40px;
+}
+
 .desk.active-student {
   border-color: var(--chalk-green);
+}
+
+.connection-bar {
+  padding: 4px 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.student-count.multiplayer {
+  color: #4ade80;
 }
 
 .desk-top {
