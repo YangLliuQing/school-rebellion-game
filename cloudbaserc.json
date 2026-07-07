@@ -1,0 +1,17 @@
+{
+  "version": "2.0",
+  "envId": "yangliuqing-d5grq63943e36590b",
+  "framework": {
+    "name": "school-rebellion-game",
+    "plugins": {
+      "client": {
+        "use": "@cloudbase/framework-plugin-website",
+        "inputs": {
+          "buildCommand": "npm run build",
+          "outputPath": "dist",
+          "cloudPath": "/yangliuqing88"
+        }
+      }
+    }
+  }
+}
