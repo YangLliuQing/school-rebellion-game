@@ -15,6 +15,15 @@
       <ConnectionStatus />
     </div>
 
+    <!-- 连接断开遮罩 -->
+    <DisconnectOverlay 
+      :visible="showDisconnect"
+      :type="disconnectType"
+      :message="disconnectMessage"
+      @retry="handleRetry"
+      @leave="handleLeaveRoom"
+    />
+
     <!-- 聊天消息列表 -->
     <div class="chat-messages" ref="msgContainer">
       <div 
@@ -85,6 +94,7 @@ import { useGameStore } from '@/store/game'
 import { useMultiplayerStore } from '@/store/multiplayer'
 import { playMessageSound } from '@/utils/sound'
 import ConnectionStatus from '@/components/ConnectionStatus.vue'
+import DisconnectOverlay from '@/components/DisconnectOverlay.vue'
 
 const gameStore = useGameStore()
 const mp = useMultiplayerStore()
@@ -92,6 +102,9 @@ const inputMsg = ref('')
 const typingVisible = ref(false)
 const msgContainer = ref(null)
 const msgEnd = ref(null)
+const showDisconnect = ref(false)
+const disconnectType = ref('disconnected')
+const disconnectMessage = ref('')
 
 const quickPhrases = [
   '老师来了！',
@@ -175,6 +188,47 @@ onUnmounted(() => {
   clearInterval(autoChatTimer)
   clearTimeout(typingTimer)
 })
+
+// 监听多人模式连接状态
+watch(() => mp.connected, (val) => {
+  if (mp.roomId && !val && mp.reconnectAttempt === 0) {
+    // 初始断开
+    showDisconnect.value = true
+    disconnectType.value = 'disconnected'
+  }
+})
+
+watch(() => mp.reconnectFailed, (val) => {
+  if (val) {
+    showDisconnect.value = true
+    disconnectType.value = 'reconnect_failed'
+    disconnectMessage.value = `已尝试重连 ${mp.maxReconnectAttempts} 次均失败`
+  }
+})
+
+watch(() => mp.lastError, (val) => {
+  if (val) {
+    if (val.includes('房间已满')) {
+      showDisconnect.value = true
+      disconnectType.value = 'room_full'
+      disconnectMessage.value = val
+    } else if (val.includes('房间不存在')) {
+      showDisconnect.value = true
+      disconnectType.value = 'room_not_found'
+      disconnectMessage.value = val
+    }
+  }
+})
+
+function handleRetry() {
+  showDisconnect.value = false
+  mp.connect()
+}
+
+function handleLeaveRoom() {
+  showDisconnect.value = false
+  mp.disconnect()
+}
 
 watch(() => gameStore.chatMessages.length, () => {
   scrollToBottom()

@@ -142,6 +142,15 @@ class GameWebSocket {
   _handleMessage(msg) {
     const { type, payload } = msg
     
+    // 处理 pong 响应
+    if (type === 'pong') {
+      if (this.heartbeatTimeout) {
+        clearTimeout(this.heartbeatTimeout)
+        this.heartbeatTimeout = null
+      }
+      return
+    }
+    
     // 触发特定类型处理器
     this._emit(type, payload)
     
@@ -179,9 +188,14 @@ class GameWebSocket {
     
     console.log(`[WS] ${delay}ms 后进行第 ${this.reconnectAttempts} 次重连`)
     this._status = 'reconnecting'
-    this._emit('reconnecting', { attempt: this.reconnectAttempts, delay })
+    this._emit('reconnecting', { 
+      attempt: this.reconnectAttempts, 
+      maxAttempts: this.maxReconnectAttempts,
+      delay,
+      nextRetryIn: Math.ceil(delay / 1000)
+    })
 
-    setTimeout(() => {
+    this._reconnectTimer = setTimeout(() => {
       if (!this.isManualClose && this._status !== 'connected') {
         this._connect()
       }
@@ -216,13 +230,5 @@ class GameWebSocket {
     }
   }
 }
-
-// 处理 pong 响应
-GameWebSocket.prototype.on('pong', function () {
-  if (this.heartbeatTimeout) {
-    clearTimeout(this.heartbeatTimeout)
-    this.heartbeatTimeout = null
-  }
-})
 
 export default GameWebSocket

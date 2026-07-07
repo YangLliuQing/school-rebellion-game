@@ -423,6 +423,7 @@ function onRoomJoined(roomId) {
 .connection-bar {
   display: flex;
   justify-content: center;
+  position: relative;
 }
 
 .modal-overlay {

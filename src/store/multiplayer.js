@@ -17,7 +17,9 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
   const connected = ref(false)
   const reconnectAttempt = ref(0)
   const reconnectFailed = ref(false)
+  const maxReconnectAttempts = ref(10)
   const lastError = ref('')
+  const maxPlayers = ref(8)
 
   // ===== 玩家身份 =====
   const playerId = ref(getOrCreatePlayerId())
@@ -181,9 +183,9 @@ export const useMultiplayerStore = defineStore('multiplayer', () => {
 
   return {
     // state
-    ws, connected, reconnectAttempt, reconnectFailed, lastError,
+    ws, connected, reconnectAttempt, reconnectFailed, maxReconnectAttempts, lastError,
     playerId, playerName, playerEmoji,
-    roomId, roomPlayers, roomAIStudents, seatMap, chatHistory, typingPlayers,
+    roomId, roomPlayers, roomAIStudents, seatMap, chatHistory, typingPlayers, maxPlayers,
     serverQuizActive, serverQuestion, serverQuizTimer,
     quizSubmitted, quizAnswered, quizTotal,
     lastQuizResult, quizAllResults, correctAnswer,

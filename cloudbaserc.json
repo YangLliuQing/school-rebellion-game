@@ -11,6 +11,23 @@
           "outputPath": "dist",
           "cloudPath": "/yangliuqing88"
         }
+      },
+      "websocket": {
+        "use": "@cloudbase/framework-plugin-function",
+        "inputs": {
+          "functionRootPath": "cloudfunctions",
+          "functions": [
+            {
+              "name": "websocket-server",
+              "timeout": 60,
+              "runtime": "Nodejs18.15",
+              "handler": "index.main",
+              "envVariables": {
+                "PORT": "9000"
+              }
+            }
+          ]
+        }
       }
     }
   }

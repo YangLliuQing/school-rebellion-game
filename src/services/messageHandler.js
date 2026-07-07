@@ -168,6 +168,7 @@ export function setupMessageHandlers(ws) {
   ws.on('reconnecting', (payload) => {
     mp.connected = false
     mp.reconnectAttempt = payload.attempt
+    mp.maxReconnectAttempts = payload.maxAttempts || 10
   })
 
   ws.on('reconnect_failed', () => {
